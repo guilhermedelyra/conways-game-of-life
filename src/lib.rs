@@ -4,6 +4,14 @@ use wasm_bindgen::prelude::*;
 extern crate fixedbitset;
 extern crate js_sys;
 use fixedbitset::FixedBitSet;
+extern crate web_sys;
+
+// A macro to provide `println!(..)`-style syntax for `console.log` logging.
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -21,6 +29,8 @@ pub struct Universe {
 #[wasm_bindgen]
 impl Universe {
     pub fn new() -> Universe {
+        utils::set_panic_hook();
+
         let width = 64;
         let height = 64;
         let size = (width * height) as usize;
@@ -91,12 +101,22 @@ impl Universe {
 
     pub fn tick(&mut self) {
         let mut next = self.cells.clone();
+        let mut revived = Vec::new();
+        let mut died = Vec::new();
 
         for row in 0..self.height {
             for col in 0..self.width {
                 let idx = self.get_index(row, col);
                 let cell = self.cells[idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
+
+                log!(
+                    "cell[{}, {}] is initially {:?} and has {} live neighbors",
+                    row,
+                    col,
+                    cell,
+                    live_neighbors
+                );
 
                 next.set(
                     idx,
@@ -107,8 +127,20 @@ impl Universe {
                         (otherwise, _) => otherwise,
                     },
                 );
+
+                log!("    it becomes {:?}", next[idx]);
+
+                if next[idx] != cell {
+                    if cell == true {
+                        died.push(idx);
+                    } else {
+                        revived.push(idx);
+                    }
+                }
             }
         }
+        log!("    cells that died -> {:?}", died);
+        log!("    cells that revived -> {:?}", revived);
 
         self.cells = next;
     }
