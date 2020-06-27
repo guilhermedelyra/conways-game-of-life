@@ -21,6 +21,7 @@ static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
 pub struct Universe {
+    size: usize,
     width: u32,
     height: u32,
     cells: FixedBitSet,
@@ -41,12 +42,29 @@ impl Universe {
         }
 
         Universe {
+            size,
             width,
             height,
             cells,
         }
     }
 
+    pub fn set_alive(&mut self, row: u32, col: u32) {
+        let idx = self.get_index(row % self.height(), col % self.width());
+        self.cells.set(idx, true);
+    }
+
+    pub fn clear(&mut self) {
+        for i in 0..self.size {
+            self.cells.set(i, false);
+        }
+    }
+
+    pub fn reset(&mut self) {
+        for i in 0..self.size {
+            self.cells.set(i, js_sys::Math::random() < 0.5);
+        }
+    }
     /// Set the width of the universe.
     ///
     /// Resets all cells to the dead state.
@@ -98,6 +116,10 @@ impl Universe {
         }
         count
     }
+    pub fn toggle_cell(&mut self, row: u32, column: u32) {
+        let idx = self.get_index(row, column);
+        self.cells.set(idx, !self.cells[idx]);
+    }
 
     pub fn tick(&mut self) {
         let mut next = self.cells.clone();
@@ -110,13 +132,13 @@ impl Universe {
                 let cell = self.cells[idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
 
-                log!(
-                    "cell[{}, {}] is initially {:?} and has {} live neighbors",
-                    row,
-                    col,
-                    cell,
-                    live_neighbors
-                );
+                // log!(
+                //     "cell[{}, {}] is initially {:?} and has {} live neighbors",
+                //     row,
+                //     col,
+                //     cell,
+                //     live_neighbors
+                // );
 
                 next.set(
                     idx,
@@ -128,7 +150,7 @@ impl Universe {
                     },
                 );
 
-                log!("    it becomes {:?}", next[idx]);
+                // log!("    it becomes {:?}", next[idx]);
 
                 if next[idx] != cell {
                     if cell == true {
@@ -139,8 +161,8 @@ impl Universe {
                 }
             }
         }
-        log!("    cells that died -> {:?}", died);
-        log!("    cells that revived -> {:?}", revived);
+        // log!("    cells that died -> {:?}", died);
+        // log!("    cells that revived -> {:?}", revived);
 
         self.cells = next;
     }
