@@ -51,6 +51,12 @@
         text-align: center;
         color: white;
       }
+
+      #fps {
+        white-space: pre;
+        font-family: monospace;
+        color: white;
+      }
     </style>
   </head>
   <body>
@@ -65,11 +71,12 @@
           min="0.5"
           step="0.25"
           max="240"
-          id="fps"
+          id="speed"
         />
-        <p>FPS: <span id="showfps"></span></p>
+        <p>MAX FPS: <span id="showfps"></span></p>
       </div>
     </navbar>
+    <div id="fps"></div>
     <canvas id="game-of-life-canvas"></canvas>
     <script src="./bootstrap.js"></script>
   </body>

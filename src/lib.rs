@@ -1,17 +1,37 @@
 mod utils;
 use std::fmt;
-use wasm_bindgen::prelude::*;
 extern crate fixedbitset;
+use wasm_bindgen::prelude::*;
 extern crate js_sys;
+//use rand::Rng;
+
 use fixedbitset::FixedBitSet;
 extern crate web_sys;
+use web_sys::console;
 
-// A macro to provide `println!(..)`-style syntax for `console.log` logging.
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
+pub struct Timer<'a> {
+    name: &'a str,
+}
+
+impl<'a> Timer<'a> {
+    pub fn new(name: &'a str) -> Timer<'a> {
+        console::time_with_label(name);
+        Timer { name }
     }
 }
+
+impl<'a> Drop for Timer<'a> {
+    fn drop(&mut self) {
+        console::time_end_with_label(self.name);
+    }
+}
+
+// // A macro to provide `println!(..)`-style syntax for `console.log` logging.
+// macro_rules! log {
+//     ( $( $t:tt )* ) => {
+//         web_sys::console::log_1(&format!( $( $t )* ).into());
+//     }
+// }
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
 // allocator.
@@ -31,14 +51,15 @@ pub struct Universe {
 impl Universe {
     pub fn new() -> Universe {
         utils::set_panic_hook();
+        // let mut rng = rand::thread_rng();  // for benches
 
-        let width = 64;
-        let height = 64;
+        let width = 120;
+        let height = 120;
         let size = (width * height) as usize;
         let mut cells = FixedBitSet::with_capacity(size);
 
         for i in 0..size {
-            cells.set(i, js_sys::Math::random() < 0.5);
+            cells.set(i, js_sys::Math::random() < 0.5); //rng.gen_range(0.0, 1.0) < 0.5);
         }
 
         Universe {
@@ -61,8 +82,9 @@ impl Universe {
     }
 
     pub fn reset(&mut self) {
+        // let mut rng = rand::thread_rng();  // for benches
         for i in 0..self.size {
-            self.cells.set(i, js_sys::Math::random() < 0.5);
+            self.cells.set(i, js_sys::Math::random() < 0.5); //rng.gen_range(0.0, 1.0) < 0.5);
         }
     }
     /// Set the width of the universe.
@@ -102,18 +124,47 @@ impl Universe {
 
     fn live_neighbor_count(&self, row: u32, column: u32) -> u8 {
         let mut count = 0;
-        for delta_row in [self.height - 1, 0, 1].iter().cloned() {
-            for delta_col in [self.width - 1, 0, 1].iter().cloned() {
-                if delta_row == 0 && delta_col == 0 {
-                    continue;
-                }
 
-                let neighbor_row = (row + delta_row) % self.height;
-                let neighbor_col = (column + delta_col) % self.width;
-                let idx = self.get_index(neighbor_row, neighbor_col);
-                count += self.cells[idx] as u8;
-            }
-        }
+        let north = if row == 0 { self.height - 1 } else { row - 1 };
+
+        let south = if row == self.height - 1 { 0 } else { row + 1 };
+
+        let west = if column == 0 {
+            self.width - 1
+        } else {
+            column - 1
+        };
+
+        let east = if column == self.width - 1 {
+            0
+        } else {
+            column + 1
+        };
+
+        let nw = self.get_index(north, west);
+        count += self.cells[nw] as u8;
+
+        let n = self.get_index(north, column);
+        count += self.cells[n] as u8;
+
+        let ne = self.get_index(north, east);
+        count += self.cells[ne] as u8;
+
+        let w = self.get_index(row, west);
+        count += self.cells[w] as u8;
+
+        let e = self.get_index(row, east);
+        count += self.cells[e] as u8;
+
+        let sw = self.get_index(south, west);
+        count += self.cells[sw] as u8;
+
+        let s = self.get_index(south, column);
+        count += self.cells[s] as u8;
+
+        let se = self.get_index(south, east);
+        count += self.cells[se] as u8;
+
         count
     }
     pub fn toggle_cell(&mut self, row: u32, column: u32) {
@@ -122,48 +173,57 @@ impl Universe {
     }
 
     pub fn tick(&mut self) {
-        let mut next = self.cells.clone();
+        let _timer = Timer::new("Universe::tick");
+
+        // let mut next = self.cells.clone();
         let mut revived = Vec::new();
         let mut died = Vec::new();
+        let mut next = {
+            let _timer = Timer::new("allocate next cells");
+            self.cells.clone()
+        };
 
-        for row in 0..self.height {
-            for col in 0..self.width {
-                let idx = self.get_index(row, col);
-                let cell = self.cells[idx];
-                let live_neighbors = self.live_neighbor_count(row, col);
+        {
+            let _timer = Timer::new("new generation");
+            for row in 0..self.height {
+                for col in 0..self.width {
+                    let idx = self.get_index(row, col);
+                    let cell = self.cells[idx];
+                    let live_neighbors = self.live_neighbor_count(row, col);
 
-                // log!(
-                //     "cell[{}, {}] is initially {:?} and has {} live neighbors",
-                //     row,
-                //     col,
-                //     cell,
-                //     live_neighbors
-                // );
+                    // log!(
+                    //     "cell[{}, {}] is initially {:?} and has {} live neighbors",
+                    //     row,
+                    //     col,
+                    //     cell,
+                    //     live_neighbors
+                    // );
 
-                next.set(
-                    idx,
-                    match (cell, live_neighbors) {
-                        (true, x) if x < 2 || x > 3 => false,
-                        (true, 2..=3) => true,
-                        (false, 3) => true,
-                        (otherwise, _) => otherwise,
-                    },
-                );
+                    next.set(
+                        idx,
+                        match (cell, live_neighbors) {
+                            (true, x) if x < 2 || x > 3 => false,
+                            (true, 2..=3) => true,
+                            (false, 3) => true,
+                            (otherwise, _) => otherwise,
+                        },
+                    );
 
-                // log!("    it becomes {:?}", next[idx]);
+                    // log!("    it becomes {:?}", next[idx]);
 
-                if next[idx] != cell {
-                    if cell == true {
-                        died.push(idx);
-                    } else {
-                        revived.push(idx);
+                    if next[idx] != cell {
+                        if cell == true {
+                            died.push(idx);
+                        } else {
+                            revived.push(idx);
+                        }
                     }
                 }
             }
         }
         // log!("    cells that died -> {:?}", died);
         // log!("    cells that revived -> {:?}", revived);
-
+        let _timer = Timer::new("free old cells");
         self.cells = next;
     }
 }
