@@ -21,14 +21,6 @@ const ctx = canvas.getContext("2d");
 
 let animationId = null;
 
-var slider = document.getElementById("speed");
-var output = document.getElementById("showfps");
-output.innerHTML = slider.value;
-
-slider.oninput = function () {
-  output.innerHTML = this.value;
-};
-
 const fps = new (class {
   constructor() {
     this.fps = document.getElementById("fps");
@@ -72,26 +64,6 @@ max of last 20 => ${Math.round(max)}fps
   }
 })();
 
-var Timer = function (callback, delay) {
-  var timerId,
-    start,
-    remaining = delay;
-
-  this.pause = function () {
-    window.clearTimeout(timerId);
-    remaining -= Date.now() - start;
-  };
-
-  this.resume = function () {
-    start = Date.now();
-    window.clearTimeout(timerId);
-    timerId = window.setTimeout(callback, remaining);
-  };
-
-  this.resume();
-};
-
-var timer = null;
 const renderLoop = () => {
   fps.render(); //new
 
@@ -99,9 +71,7 @@ const renderLoop = () => {
   drawGrid();
   drawCells();
 
-  // timer = new Timer(() => {
   animationId = requestAnimationFrame(renderLoop);
-  // }, 1000 / slider.value);
 };
 
 const isPaused = () => {
@@ -113,26 +83,30 @@ const resetButton = document.getElementById("reset-board");
 const clearButton = document.getElementById("clear-board");
 resetButton.textContent = "re-generate";
 resetButton.addEventListener("click", (event) => {
-  timer.pause();
   universe.reset();
-  timer.resume();
+  if (isPaused()) {
+    play();
+    pause();
+  }
 });
 
 clearButton.textContent = "clear";
 clearButton.addEventListener("click", (event) => {
   universe.clear();
+  if (isPaused()) {
+    play();
+    pause();
+  }
 });
 const play = () => {
   playPauseButton.textContent = "⏸";
   renderLoop();
-  timer.resume();
 };
 
 const pause = () => {
   playPauseButton.textContent = "▶";
   cancelAnimationFrame(animationId);
   animationId = null;
-  timer.pause();
 };
 
 playPauseButton.addEventListener("click", (event) => {

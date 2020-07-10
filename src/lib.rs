@@ -3,7 +3,7 @@ use std::fmt;
 extern crate fixedbitset;
 use wasm_bindgen::prelude::*;
 extern crate js_sys;
-use rand::Rng;
+// use rand::Rng;
 
 use fixedbitset::FixedBitSet;
 extern crate web_sys;
@@ -26,41 +26,31 @@ impl<'a> Drop for Timer<'a> {
     }
 }
 
-// // A macro to provide `println!(..)`-style syntax for `console.log` logging.
-// macro_rules! log {
-//     ( $( $t:tt )* ) => {
-//         web_sys::console::log_1(&format!( $( $t )* ).into());
-//     }
-// }
-
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
-// allocator.
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-// #[wasm_bindgen]
+#[wasm_bindgen]
 pub struct Universe {
     size: usize,
     width: u32,
     height: u32,
-    cells: Vec<FixedBitSet>,
+    cells: [FixedBitSet; 2],
     buffer: usize,
 }
 
-// #[wasm_bindgen]
+#[wasm_bindgen]
 impl Universe {
     pub fn new() -> Universe {
         utils::set_panic_hook();
-        let mut rng = rand::thread_rng(); // for benches
+        // let mut rng = rand::thread_rng(); // for benches
 
-        let width = 120;
-        let height = 120;
+        let width = 64;
+        let height = 64;
         let size = (width * height) as usize;
-        let mut cells = vec![FixedBitSet::with_capacity(size); 2];
+        let mut cells = [
+            FixedBitSet::with_capacity(size),
+            FixedBitSet::with_capacity(size),
+        ];
         let buffer = 0;
         for i in 0..size {
-            cells[buffer].set(i, rng.gen_range(0.0, 1.0) < 0.5); // js_sys::Math::random() < 0.5);
+            cells[buffer].set(i, js_sys::Math::random() < 0.5); // rng.gen_range(0.0, 1.0) < 0.5); //
         }
 
         Universe {
@@ -84,27 +74,20 @@ impl Universe {
     }
 
     pub fn reset(&mut self) {
-        let mut rng = rand::thread_rng(); // for benches
+        // let mut rng = rand::thread_rng(); // for benches
         for i in 0..self.size {
-            self.cells[self.buffer].set(i, rng.gen_range(0.0, 1.0) < 0.5); // js_sys::Math::random() < 0.5);
+            self.cells[self.buffer].set(i, js_sys::Math::random() < 0.5); // rng.gen_range(0.0, 1.0) < 0.5); //
         }
     }
-    /// Set the width of the universe.
-    ///
-    /// Resets all cells to the dead state.
+
     pub fn set_width(&mut self, width: u32) {
         self.width = width;
-        self.cells[0].clear();
-        self.cells[1].clear();
+        self.cells[self.buffer].clear();
     }
 
-    /// Set the height of the universe.
-    ///
-    /// Resets all cells to the dead state.
     pub fn set_height(&mut self, height: u32) {
         self.height = height;
-        self.cells[0].clear();
-        self.cells[1].clear();
+        self.cells[self.buffer].clear();
     }
 
     pub fn width(&self) -> u32 {
@@ -223,13 +206,10 @@ impl Universe {
 }
 
 impl Universe {
-    /// Get the dead and alive values of the entire universe.
     pub fn get_cells(&self) -> &FixedBitSet {
         &self.cells[self.buffer]
     }
 
-    /// Set cells to be alive in a universe by passing the row and column
-    /// of each cell as an array.
     pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
         for (row, col) in cells.iter().cloned() {
             let idx = self.get_index(row, col);
